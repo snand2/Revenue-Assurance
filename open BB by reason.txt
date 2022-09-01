@@ -1,0 +1,15 @@
+SELECT
+       *,
+       CASE
+              WHEN Bill_Block_Reason LIKE 'Auto%' THEN 'Auto'
+              WHEN Bill_Block_Reason LIKE 'Bulk%' THEN 'Bulk'
+              ELSE 'Manual'
+       END AS Bill_Block_Type
+FROM
+       SP_COMMERCIAL.Bill_Block
+WHERE
+       Bill_Block_End_Date = '99991231'
+
+--Here you can set the Bill Block reason code you want to query--
+
+and Bill_Block_Code in ('84') 

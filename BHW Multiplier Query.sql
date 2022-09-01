@@ -1,0 +1,13 @@
+SELECT EAST.ANLAGE as "Installation",  V.VERTRAG AS "Contract", V.ABSSTOPDAT AS "Contract End Date", ET.EQUNR as "Equipment", ET.ZWFAKT as "Multiplier", ET.AB as "Device valid from", ET.BIS as "Device valid to", EAD.THGVER as "Consumption Type", EAST.TARIFART as "Tariff"
+FROM COMMERCIAL.ETDZ ET
+LEFT JOIN COMMERCIAL.EADZ EAD
+ON ET.LOGIKZW = EAD.LOGIKZW
+LEFT JOIN COMMERCIAL.EASTS EAST
+ON ET.LOGIKZW = EAST.LOGIKZW
+LEFT JOIN COMMERCIAL.EVER V
+ON EAST.ANLAGE = V.ANLAGE
+WHERE THGVER = 'WTR-LTR'
+AND ET.BIS = '99991231'
+
+select top 5  *
+from commercial.ever

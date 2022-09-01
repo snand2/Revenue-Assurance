@@ -1,0 +1,56 @@
+Select 
+db3.BELZEILE as "Line Item", 
+db1.BELNR as "Bill Doc",
+db1.BELZART as "Line Item Type", 
+db1.STTARIF as "STTARIF", 
+db1.AKLASSE as "Class", 
+db1.TARIFTYP as "Rate type", 
+db1.STATTART as "STATTART", 
+db1.EIN01 as "EIN01", 
+db1.EIN02 as "EIN02", 
+db1.ABRMENGE as "Billing Quantity", 
+db3.PREIS as "Price",
+db3.PREISBTR as "Price Amount",
+db3.NETTOBTR as "Amount", 
+erch.GPARTNER as "Business Partner", 
+erch.VKONT as "Account Number", 
+erch.vertrag as "Contract", 
+TO_DATE (erch.BEGABRPE) as "Start Billing Period", 
+TO_DATE (erch.ENDABRPE) as "End Billing Period", 
+TO_DATE (erch.ERDAT) as "Creation date"
+from dataint.tbl_sapisu_dberchz1 db1 -- table that has line items
+inner join 
+dataint.tbl_sapisu_dberchz3 db3  --joining in table that has pricing info
+on db1.BELNR = db3.BELNR 
+and db1.BELZEILE = db3.BELZEILE 
+and db3.PREISBTR = 0 -- specifically zero pricing for that line item
+inner join 
+commercial.erch erch --joining to bill doc table
+on db3.belnr = erch.belnr 
+and erch.erdat >= '20210324' --start date of which data is  from
+and erch.stornodat ='00000000' -- no reversal date, not reversed
+
+where  db1.ABRMENGE <> 0 --has quantity to be billed
+and db1.belzart in ('ZCL1OA',
+'ZCL2OA',
+'ZSSMOA',
+'ZS33OA',
+'ZDO_AT',
+'ZS31OA',
+'ZNCLAT',
+'ZGU_AT',
+'ZSPVAT',
+'ZDM_AT',
+'ZCLMAT',
+'ZOP_AT',
+'1',
+'ZPK_AT',
+'ZT33AT',
+'ZCL1AT',
+'ZSH_AT',
+'ZT31AT',
+'ZCL2AT',
+'ZSC_OA',
+'ZSNBAT',
+'ZSBNAT') --these are the areas of concern, they are general usage, supply charges, feed in tariffs and demand charges
+

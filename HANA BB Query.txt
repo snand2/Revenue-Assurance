@@ -1,0 +1,140 @@
+CREATE TABLE SP_OPEN.BB_REASON_CODE AS 
+       (SELECT * FROM "A106701"."BB_REASON_CODE")
+       
+       CREATE LOCAL TEMPORARY TABLE #T1 AS
+       (SELECT                               EVER.ANLAGE
+                                               ,EVER.VERTRAG
+                                               ,EVER.VKONTO
+                                               ,EVER.SPARTE
+                                               ,EVER.KOFIZ
+                                               ,EVER.ABRSPERR
+                                               ,EVER.EINZDAT
+                                               ,EVER.AUSZDAT
+                                               ,EVER.LOEVM
+                                               ,EVER.FAKTURIERT AS FINAL_BILL_FLAG
+       FROM                        "COMMERCIAL"."EVER" EVER
+       WHERE                              EVER.ABRSPERR !=''
+       AND                                       EVER.FAKTURIERT ='');
+
+
+
+
+
+       CREATE LOCAL TEMPORARY TABLE #T2 AS
+       (SELECT                                 A.*
+                                           ,B.BB_REASON
+       FROM                             #T1 AS A
+       LEFT JOIN                        "SP_OPEN"."BB_REASON_CODE" AS B
+       ON                                      A.ABRSPERR = B.BB_CODE);
+
+--DELETE FROM "A106701"."BB_REASON_CODE"
+--SELECT * FROM "A106701"."BB_REASON_CODE"
+
+       --STEP 2 - ADD CUSTOMER CLASS - EXCLUDE COLL,MCG,CNI - 
+
+       CREATE LOCAL TEMPORARY TABLE #T2B AS                 
+       (SELECT                          A.*
+                                           ,B.KTOKL
+                                           ,B.GPART
+       FROM                            #T2 A
+       LEFT JOIN                       "CUSTOMER"."FKKVKP" AS B
+       ON                                     A.VKONTO = B.VKONT);      
+       --DROP TABLE #T2B;
+       
+       CREATE LOCAL TEMPORARY TABLE #T3 AS 
+       (SELECT                                 A.*
+                                               ,CASE
+                                               WHEN B.BPKIND = 'MCG' THEN '1.MCG'
+                                               WHEN B.BPKIND = 'MUL' THEN '2.MUL'
+                                               WHEN B.BPKIND = 'INC' THEN '3.CNI'
+                                               WHEN B.BPKIND = 'MJR' THEN '3.CNI'
+                                               WHEN A.KTOKL  = 'COLL' THEN '1.MCG'
+                                               WHEN A.KTOKL  = '1CNI' THEN '3.CNI'
+                            WHEN A.KTOKL  = '2CNI' THEN '3.CNI'
+                            ELSE '3.MASS'
+                            END AS BPGrouping
+                            ,COALESCE(CONCAT(CONCAT(B.NAME_FIRST,' '),B.NAME_LAST), B.NAME_ORG1, 'UNKNOWN') AS "NAMEOFCUST"
+       FROM                             #T2B AS A
+       LEFT JOIN                        "CUSTOMER"."ISU_BUT000" AS B
+       ON                                      A.GPART = B.PARTNER);
+       --WHERE                                 B.BPKIND NOT IN ('MCG','INC','MUL')
+       --AND                            A.KTOKL  NOT IN ('COLL','1CNI','2CNI'))
+
+
+       
+       --STEP 3 FIND BILL CYCLE TYPE, AND NEXT SCHEDULED BILL DATE BASED ON CURRENT MRU
+
+       CREATE LOCAL TEMPORARY TABLE #T4 AS 
+       (SELECT                                 A.*
+                                           ,B.ABLEINH
+                                           ,CASE
+                                           WHEN B.ABLEINH LIKE ('FB%') THEN '1.FLEXI'
+                                           WHEN B.ABLEINH LIKE ('ARM%') THEN '2.MONTHLY'
+                                           WHEN B.ABLEINH LIKE ('ARB%') THEN '3.BI-MONTHLY'
+                                           WHEN B.ABLEINH LIKE ('ARQ%') THEN '4.QUARTERLY'
+                                           WHEN B.ABLEINH LIKE ('SRQ%') THEN '4.QUARTERLY'
+                                           WHEN B.ABLEINH LIKE ('9999') THEN '4.QUARTERLY'
+                                           ELSE NULL
+                                           END AS BILLING_FREQ
+       FROM                          #T3 A
+       LEFT JOIN                    "COMMERCIAL"."EANLH" B
+       ON                                  A.ANLAGE = B.ANLAGE
+       AND                           B.BIS = '99991231');
+       
+       
+       
+       CREATE LOCAL TEMPORARY TABLE #T5 AS 
+       (SELECT DISTINCT          B.TERMSCHL
+                                           ,B.TERMTDAT
+       FROM                             #T4 A
+       LEFT JOIN                        "OPEN"."TE418" B
+       ON                                      A.ABLEINH = B.TERMSCHL
+       WHERE                            B.TERMTDAT > CURRENT_DATE );
+       
+       
+        --SELECT TOP 5 * FROM "CUSTOMER"."FKKVKP"                        
+
+ 
+       CREATE LOCAL TEMPORARY TABLE #T6 AS 
+       (SELECT                          *
+                                               ,ROW_NUMBER() OVER(PARTITION BY TERMSCHL ORDER BY TERMTDAT ASC) AS ROWN
+       FROM                            #T5);
+       
+        
+        
+        CREATE LOCAL TEMPORARY TABLE #T7 AS 
+       (SELECT                                 A.*
+                                               ,B.TERMTDAT
+       FROM                            #T4 A
+       LEFT JOIN                       #T6 B
+       ON                                     A.ABLEINH = B.TERMSCHL
+       AND                             B.ROWN =1);
+       
+        
+        CREATE LOCAL TEMPORARY TABLE #T15 AS 
+       (SELECT                                 DISTINCT
+                                               ANLAGE AS INSTALLATION
+                                               ,VERTRAG AS ISU_CONTRACT
+                                    ,VKONTO AS CONTRACT_ACCOUNT
+                            ,GPART AS BUSINESS_PARTNER
+                            ,KTOKL AS CUSTOMER_CLASS
+                            ,SPARTE AS DIVISION
+                            ,KOFIZ AS ACCOUNT_DET_ID
+                            ,ABRSPERR AS BILL_BLOCK_CODE
+                            ,BB_REASON
+                            ,EINZDAT AS CONTRACT_START
+                            ,AUSZDAT AS CONTRACT_END
+                            ,LOEVM AS REVERSAL_FLAG
+                            ,ABLEINH AS MRU
+                            ,BILLING_FREQ
+                            ,TERMTDAT AS NEXT_SCH_BILL_DATE
+                            ,FINAL_BILL_FLAG
+                            --,OPEN_BILL_ORDER
+                            --,FINAL_BILL_ORDER
+                            ,BPGROUPING AS BILLING_GROUP
+                            ,NAMEOFCUST AS NAME_OF_CUSTOMER
+       FROM                 #T7
+       WHERE                ANLAGE !=''
+       AND                  ABRSPERR != 'AD');
+       
+       SELECT * FROM #T15
