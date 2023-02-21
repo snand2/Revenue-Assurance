@@ -1,0 +1,9 @@
+SELECT DISTINCT nd.nmi
+       , nd.nmi_classification_code
+       , nd.status
+       , nd.jurisdiction_code
+	   ,pr.party
+ FROM nbvprod.sdr.nmi_data nd
+ LEFT OUTER JOIN nbvprod.sdr.participant_relations pr ON pr.nmi = nd.nmi AND pr.row_status = 'A' AND pr.Role = 'FRMP' AND pr.to_date = '9999-12-31 00:00:00'
+ WHERE nd.row_status = 'A' AND nd.to_Date = '9999-12-31 00:00:00'
+ AND nd.nmi IN ('4310219144')
